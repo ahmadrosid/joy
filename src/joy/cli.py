@@ -1,8 +1,9 @@
 """Terminal interface for the initial scaffold."""
 
-import asyncio
+import os
 import sys
 import time
+from contextlib import aclosing
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.filters import Always, Condition
@@ -18,12 +19,24 @@ from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.text import Text
 
+from joy.llm import MODEL, stream_reply
+
 
 def main() -> None:
     console = Console(
         color_system="truecolor" if sys.stdout.isatty() else None,
         no_color=False,
     )
+    if not os.environ.get("OPENAI_API_KEY"):
+        console.print("[red]Set OPENAI_API_KEY in your environment before running joy.[/red]")
+        return
+    history = [{
+        "role": "system",
+        "content": "You are Joy, a concise coding assistant. Help with code and explain clearly. "
+        "You currently have no tools to read files, edit code, or run tests. "
+        "Never claim to have performed those actions.",
+    }]
+    answer = ""
     bindings = KeyBindings()
     waiting = False
     draft = ""
@@ -58,16 +71,35 @@ def main() -> None:
                 ("fg:ansigreen", "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"[int(time.monotonic() * 10) % 10]),
                 ("", " Thinking… · You can type; Enter sends after the reply"),
             ]), height=2),
-            filter=Condition(lambda: waiting),
+            filter=Condition(lambda: waiting and not answer),
+        ),
+        ConditionalContainer(
+            HSplit([
+                Window(FormattedTextControl(
+                    lambda: [("", answer), ("[SetCursorPosition]", "")],
+                    show_cursor=False,
+                ), wrap_lines=True, height=Dimension(max=12), dont_extend_height=True,
+                    get_line_prefix=lambda line, wrap: " "),
+                Window(height=1),
+            ]),
+            filter=Condition(lambda: waiting and bool(answer)),
         ),
         Frame(session.layout.container),
     ])
 
-    async def finish_wait() -> None:
-        await asyncio.sleep(1.5)
+    async def finish_wait(messages: list[dict[str, str]]) -> None:
+        nonlocal answer
+        try:
+            async with aclosing(stream_reply(messages)) as stream:
+                async for chunk in stream:
+                    answer += chunk
+                    session.app.invalidate()
+        except Exception as error:
+            session.app.exit(exception=error)
+            return
         session.app.exit(result=session.default_buffer.text)
 
-    console.print("[bold cyan]Joy[/bold cyan] — coding agent scaffold\n")
+    console.print(f"[bold cyan]Joy[/bold cyan] — {MODEL}\n")
     console.print("Type /quit to exit. Ctrl-C cancels input; Ctrl-D exits.\n")
     console.print("[dim]Enter sends · Alt+Enter adds a new line[/dim]")
     while True:
@@ -89,20 +121,33 @@ def main() -> None:
                 style="#ffffff on #393939",
             ))
             console.print()
-            console.print("[bold green]Joy[/bold green]")
             waiting = True
+            answer = ""
+            messages = [*history, {"role": "user", "content": message}]
             try:
                 draft = session.prompt(
                     "› ",
                     refresh_interval=0.1,
-                    pre_run=lambda: session.app.create_background_task(finish_wait()),
+                    pre_run=lambda: session.app.create_background_task(finish_wait(messages)),
                 )
             except KeyboardInterrupt:
+                draft = session.default_buffer.text
+                if answer:
+                    console.print(Padding(Markdown(answer), (0, 0, 0, 1)))
                 console.print("[dim]Response cancelled.[/dim]\n")
                 continue
             except EOFError:
+                if answer:
+                    console.print(Padding(Markdown(answer), (0, 0, 0, 1)))
                 break
+            except Exception as error:
+                draft = session.default_buffer.text
+                if answer:
+                    console.print(Padding(Markdown(answer), (0, 0, 0, 1)))
+                console.print(Text(str(error), style="red"))
+                continue
             finally:
                 waiting = False
-            console.print(Markdown("**Demo reply:** AI is not connected yet. Your message appears above."))
+            history = [*messages, {"role": "assistant", "content": answer}]
+            console.print(Padding(Markdown(answer), (0, 0, 0, 1)))
             console.print()

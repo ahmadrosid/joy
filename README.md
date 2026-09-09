@@ -1,6 +1,6 @@
 # Joy
 
-A Python coding agent scaffold using aisuite, prompt_toolkit, and Rich.
+A Python coding assistant using aisuite, prompt_toolkit, and Rich.
 
 ## Run
 
@@ -8,6 +8,7 @@ A Python coding agent scaffold using aisuite, prompt_toolkit, and Rich.
 python3.13 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
+export OPENAI_API_KEY="your-api-key"
 joy
 ```
 
@@ -16,7 +17,7 @@ Ctrl-C cancels the current input.
 The gray input has one editable row and one blank row above and below.
 Enter sends; Alt+Enter inserts a newline. Submitted messages appear in the
 conversation above the input. User messages match the gray input styling;
-assistant replies have a Joy label on the normal terminal background.
+assistant replies appear on the normal terminal background without a name label.
 User text is displayed literally; assistant replies support Markdown and code blocks.
 
 Use Python 3.10–3.13; aisuite's current docstring-parser dependency fails on 3.14.
@@ -27,13 +28,24 @@ Use Python 3.10–3.13; aisuite's current docstring-parser dependency fails on 3
 python -m unittest discover -s tests
 ```
 
-## Scope
+## Chat
 
-The scaffold includes packaging, a terminal chat interface, and a smoke test.
-Replies are clearly labeled demos; no model is connected yet.
-A Thinking spinner simulates a 1.5-second wait before each reply. Ctrl-C cancels
-the pending reply. The input stays visible and editable during the wait;
-draft text is preserved, and Enter can send it once the reply finishes.
-Model calls, code reading, code editing, and test-running tools are not implemented yet.
-No API key is needed to run the scaffold. When connecting a model, install the
-chosen provider's [aisuite extra](https://github.com/andrewyng/aisuite) and configure its API key.
+Joy uses [GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna)
+through aisuite with model ID `openai:gpt-5.6-luna`.
+The OpenAI provider is included when installing the project. Set `OPENAI_API_KEY`
+in your shell; `.env` files are not loaded automatically.
+
+Successful exchanges are kept in memory for follow-up questions until you exit.
+The Thinking spinner runs until the first response text arrives. Text then streams
+above the input, with the latest lines visible for long replies. The completed
+reply is rendered as Markdown in the conversation. Input stays visible and
+editable; your next draft is preserved until the response finishes.
+Ctrl-C discards the pending reply immediately. The underlying synchronous API
+request may continue until completion or its 60-second timeout; it cannot update
+the conversation after cancellation. Partial text remains visible if streaming
+fails or is cancelled, but failed and cancelled exchanges are excluded
+from model history. API errors return you to the input without losing your draft.
+
+Code reading, editing, and test-running tools are not implemented yet.
+Tests use mocked replies and HTTP transport; they do not require an API key or
+make network calls.
