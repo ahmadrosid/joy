@@ -55,6 +55,13 @@ def main() -> None:
     def newline(event: KeyPressEvent) -> None:
         event.current_buffer.insert_text("\n")
 
+    @bindings.add("<bracketed-paste>")
+    def paste(event: KeyPressEvent) -> None:
+        text = event.data.replace("\r\n", "\n").replace("\r", "\n")
+        event.current_buffer.insert_text(text)
+        # Keep trailing newlines, but show text in the one-row viewport after paste.
+        event.current_buffer.cursor_position -= len(text) - len(text.rstrip("\n"))
+
     session: PromptSession[str] = PromptSession(
         erase_when_done=True,
         multiline=True,

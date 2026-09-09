@@ -17,6 +17,37 @@ from joy.cli import main
 
 
 class CliTest(unittest.TestCase):
+    def test_paste_ending_in_newline_stays_visible(self):
+        original_prompt = PromptSession.prompt
+        failures = []
+        inspected = []
+        with create_pipe_input() as pipe:
+            def prompt(session, *args, **kwargs):
+                async def paste_and_inspect():
+                    pipe.send_text('\x1b[200~first line\r\nlast line\r\n\x1b[201~')
+                    await asyncio.sleep(0.05)
+                    try:
+                        self.assertEqual(session.default_buffer.text, 'first line\nlast line\n')
+                        info = session.layout.current_window.render_info
+                        visible = to_plain_text(info.ui_content.get_line(info.vertical_scroll))
+                        self.assertIn('last line', visible)
+                        inspected.append(True)
+                    except AssertionError as error:
+                        failures.append(error)
+                    finally:
+                        session.app.exit(result='/exit')
+
+                kwargs['pre_run'] = lambda: session.app.create_background_task(paste_and_inspect())
+                return original_prompt(session, *args, **kwargs)
+
+            with create_app_session(input=pipe, output=DummyOutput()), \
+                    redirect_stdout(StringIO()), patch.object(PromptSession, 'prompt', prompt), \
+                    patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+                main()
+        if failures:
+            raise failures[0]
+        self.assertTrue(inspected)
+
     def test_prompt_and_exit(self):
         output = StringIO()
         original_prompt = PromptSession.prompt
