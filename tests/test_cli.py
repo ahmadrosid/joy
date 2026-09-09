@@ -30,7 +30,7 @@ class CliTest(unittest.TestCase):
             "draft for later\r",
             "\r",
             "",
-            "/quit\r",
+            "/exit\r",
         ])
         defaults = []
 

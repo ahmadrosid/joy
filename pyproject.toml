@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "aisuite[openai]>=0.1.14,<0.2",
+    "openai>=1.107,<2",
     "pydantic>=2,<3", # aisuite imports this but omits it from its base dependencies.
     "prompt-toolkit>=3.0.53,<4",
     "rich>=13,<15",

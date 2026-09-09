@@ -18,7 +18,7 @@ Behavior:
 - Enter submits.
 - Alt+Enter inserts a newline, but the visible editable area stays one row tall.
 - Ctrl+C cancels input.
-- Ctrl+D on empty input or /quit exits.
+- Ctrl+D on empty input or /exit exits.
 - Use Rich for output outside the input area.
 
 Keep it minimal. For now, respond to submitted text with “Agent functionality is not connected yet.” Do not implement AI calls or coding tools.
